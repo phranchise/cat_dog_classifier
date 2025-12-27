@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Cat or Dog Classifier</title>
+  <meta name="description" content="Try the Cat or Dog Classifier live. Upload, paste, or drag-and-drop an image to see Cat vs Dog confidence scores from my Hugging Face model." />
+
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg-primary:#f9fafb;
+      --bg-elevated:#ffffff;
+      --text-primary:#0f172a;
+      --text-secondary:#4b5563;
+      --border:#e5e7eb;
+      --accent:#1d4ed8;
+      --accent-soft:rgba(37,99,235,0.10);
+      --shadow:0 18px 40px rgba(15, 23, 42, 0.08);
+      --radius:22px;
+      --radius-sm:16px;
+      --max: 980px;
+
+      --pad-page: clamp(14px, 3.5vw, 22px);
+      --pad-card: clamp(16px, 3.5vw, 22px);
+      --gap: clamp(14px, 3vw, 18px);
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg-primary:#020617;
+        --bg-elevated:#020617;
+        --text-primary:#e5e7eb;
+        --text-secondary:#9ca3af;
+        --border:#111827;
+        --accent-soft:rgba(59,130,246,0.18);
+        --shadow:0 18px 40px rgba(0,0,0,0.55);
+      }
+    }
+
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    html,body{
+      font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(37, 99, 235, 0.10), transparent 58%),
+        var(--bg-primary);
+      color:var(--text-primary);
+      -webkit-font-smoothing:antialiased;
+      scroll-behavior:smooth;
+      min-height:100%;
+    }
+    body{
+      padding: var(--pad-page);
+      display:flex;
+      justify-content:center;
+    }
+    .page{
+      width:100%;
+      max-width: var(--max);
+      display:grid;
+      gap: var(--gap);
+      padding-bottom: calc(var(--pad-page) + env(safe-area-inset-bottom) + 74px);
+    }
+
+    header{ display:grid; gap: 8px; padding: 6px 2px; }
+    .kicker{
+      display:inline-flex; align-items:center; gap:8px; width:fit-content;
+      font-size:0.78rem; padding:6px 10px; border-radius:999px;
+      background: var(--accent-soft); color: var(--accent);
+    }
+    .dot{ width:6px; height:6px; border-radius:999px; background: var(--accent); }
+    h1{
+      font-size: clamp(1.55rem, 4vw, 2.0rem);
+      font-weight: 650;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+    }
+    .sub{
+      color: var(--text-secondary);
+      font-size: clamp(0.92rem, 1.6vw, 1.0rem);
+      line-height: 1.55;
+      max-width: 80ch;
+    }
+    .sub b{ color: var(--text-primary); font-weight: 650; }
+
+    .card{
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: var(--pad-card);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .grid{
+      display:grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+      align-items:start;
+    }
+    @media (min-width: 860px){
+      .grid{ grid-template-columns: 1.2fr 0.8fr; gap: 16px; }
+    }
+
+    .panel{ display:grid; gap: 12px; }
+    .row{ display:flex; flex-wrap:wrap; gap: 10px; align-items:center; justify-content:space-between; }
+
+    .status{
+      display:flex; align-items:center; gap: 8px;
+      font-size: 0.86rem; color: var(--text-secondary);
+    }
+    .status-bullet{
+      width:8px;height:8px;border-radius:999px;
+      background: rgba(148,163,184,0.55);
+    }
+    .status-bullet.ok{ background: #46d39a; }
+    .status-bullet.bad{ background: #ff6b6b; }
+
+    .file{
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(148,163,184,0.45);
+      background: rgba(15,23,42,0.02);
+      color: var(--text-secondary);
+      outline: none;
+    }
+
+    .preview{
+      width:100%;
+      aspect-ratio: 16/10;
+      border-radius: var(--radius-sm);
+      border: 1px dashed rgba(148,163,184,0.55);
+      background: rgba(15,23,42,0.02);
+      overflow:hidden;
+      display:grid;
+      place-items:center;
+      position: relative;
+    }
+    .preview.dragover{
+      border-color: rgba(29,78,216,0.75);
+      box-shadow: 0 0 0 4px rgba(29,78,216,0.12);
+    }
+    .preview img{
+      width:100%;
+      height:100%;
+      object-fit: cover;
+      display:none;
+    }
+    .hint{
+      padding: 14px;
+      text-align:center;
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.45;
+      max-width: 60ch;
+    }
+
+    .actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap: 10px;
+      align-items:center;
+    }
+
+    .btn{
+      border-radius: 999px;
+      font-size: 0.92rem;
+      padding: 10px 14px;
+      border: 1px solid rgba(148,163,184,0.55);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: transform 180ms ease-out, box-shadow 180ms ease-out, background 180ms ease-out, border-color 180ms ease-out, opacity 180ms ease-out;
+      min-height: 44px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap: 8px;
+      user-select:none;
+      white-space: nowrap;
+    }
+    .btn:hover{
+      background: rgba(148,163,184,0.10);
+      transform: translateY(-1px);
+    }
+    .btn:active{ transform: translateY(0); }
+    .btn:disabled{ opacity: 0.55; cursor: not-allowed; transform:none; }
+
+    .btn.primary{
+      background: var(--accent);
+      border-color: rgba(29,78,216,0.65);
+      color: #fff;
+      box-shadow: 0 12px 30px rgba(37,99,235,0.25);
+    }
+    .btn.primary:hover{
+      box-shadow: 0 18px 40px rgba(37,99,235,0.35);
+      background: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .meta{
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      line-height: 1.4;
+    }
+
+    /* Examples */
+    .examples{
+      display:grid;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .examples-title{
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.10em;
+      color: var(--text-secondary);
+    }
+    .example-row{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .example{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(148,163,184,0.40);
+      background: rgba(15,23,42,0.02);
+      cursor: pointer;
+      transition: transform 180ms ease-out, background 180ms ease-out, border-color 180ms ease-out;
+      min-height: 44px;
+    }
+    .example:hover{
+      transform: translateY(-1px);
+      background: rgba(148,163,184,0.10);
+      border-color: rgba(148,163,184,0.55);
+    }
+    .thumb{
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 1px solid rgba(148,163,184,0.35);
+      flex: 0 0 auto;
+    }
+    .ex-text{ display:grid; gap: 2px; line-height: 1.2; }
+    .ex-name{ font-weight: 650; font-size: 0.92rem; color: var(--text-primary); }
+    .ex-sub{ font-size: 0.82rem; color: var(--text-secondary); }
+
+    /* Results */
+    .resultCard{ display:grid; gap: 12px; }
+    .box{
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(148,163,184,0.35);
+      background: rgba(15,23,42,0.02);
+      padding: 14px;
+      display:grid;
+      gap: 10px;
+      min-height: 92px;
+    }
+    .label{
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .small{
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .bars{
+      display:grid;
+      gap: 10px;
+      margin-top: 2px;
+    }
+    .barRow{ display:grid; gap: 6px; }
+    .barTop{
+      display:flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+    }
+    .barTop b{ color: var(--text-primary); font-weight: 650; }
+    .track{
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.45);
+      background: rgba(15,23,42,0.02);
+      overflow: hidden;
+    }
+    .fill{
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      border-radius: 999px;
+      transition: width 260ms ease-out;
+    }
+
+    details{
+      border-radius: var(--radius-sm);
+      border: 1px dashed rgba(148,163,184,0.55);
+      background: rgba(15,23,42,0.01);
+      padding: 10px 12px;
+    }
+    summary{
+      cursor:pointer;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      font-weight: 650;
+      list-style:none;
+    }
+    summary::-webkit-details-marker{ display:none; }
+    pre{
+      margin-top: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    footer{
+      display:flex;
+      flex-wrap:wrap;
+      gap: 10px;
+      justify-content:space-between;
+      align-items:center;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      padding: 2px 2px 0;
+    }
+    a.link{
+      color: var(--accent);
+      text-decoration:none;
+      font-weight: 650;
+    }
+    a.link:hover{ text-decoration: underline; }
+
+    /* Mobile sticky CTA */
+    .cta-bar{
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      padding: 10px var(--pad-page);
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      backdrop-filter: blur(14px);
+      z-index: 50;
+    }
+    .cta-inner{
+      max-width: var(--max);
+      margin: 0 auto;
+      display:flex;
+      gap: 10px;
+    }
+    .cta-inner .btn{ flex: 1; max-width: 520px; }
+    @media (min-width: 900px){
+      .cta-bar{ display:none; }
+      .page{ padding-bottom: 0; }
+    }
+
+    .fade-in{
+      opacity:0;
+      transform: translateY(8px);
+      animation: fadeInUp 460ms ease-out forwards;
+    }
+    .d1{ animation-delay: 60ms; }
+    .d2{ animation-delay: 120ms; }
+    @keyframes fadeInUp{ to { opacity:1; transform: translateY(0);} }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <header class="fade-in">
+      <div class="kicker"><span class="dot"></span> Live model demo</div>
+      <h1>Cat or Dog Classifier</h1>
+      <p class="sub">
+        Try it instantly in your browser: <b>upload</b>, <b>paste</b> (Ctrl+V), or <b>drag &amp; drop</b> an image.
+        You’ll see the predicted label plus <b>Cat vs Dog confidence</b>.
+      </p>
+    </header>
+
+    <section class="card fade-in d1">
+      <div class="grid">
+        <!-- Left -->
+        <div class="panel">
+          <div class="row">
+            <div class="status" id="status">
+              <span class="status-bullet" id="statusDot"></span>
+              <span id="statusText">Ready</span>
+            </div>
+            <button class="btn" id="clearBtn" type="button" disabled>Clear</button>
+          </div>
+
+          <input class="file" id="fileInput" type="file" accept="image/*" />
+
+          <div class="preview" id="preview" tabindex="0" aria-label="Image drop zone">
+            <img id="previewImg" alt="Selected preview" />
+            <div class="hint" id="previewHint">
+              Drop an image here, paste from clipboard, or use “Choose File”.
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn primary" id="predictBtn" type="button" disabled>Predict</button>
+            <div class="meta" id="fileMeta"></div>
+          </div>
+
+          <div class="examples">
+            <div class="examples-title">Try examples</div>
+            <div class="example-row" id="exampleRow"></div>
+            <div class="meta">
+              These examples are included in the site repo: <b>Cat.jpg</b>, <b>Dog.jpg</b>, <b>Dunno.jpg</b>.
+            </div>
+          </div>
+
+          <div class="meta">
+            Paste support depends on browser/OS. Upload and examples work everywhere.
+          </div>
+        </div>
+
+        <!-- Right -->
+        <div class="resultCard">
+          <div class="box">
+            <div class="label" id="resultLabel">No prediction yet</div>
+            <div class="small" id="resultSub">Upload (or paste) an image, then click Predict.</div>
+
+            <div class="bars" aria-label="Confidence breakdown">
+              <div class="barRow">
+                <div class="barTop"><span><b>Cat</b></span><span id="catPct">—</span></div>
+                <div class="track"><div class="fill" id="catFill"></div></div>
+              </div>
+              <div class="barRow">
+                <div class="barTop"><span><b>Dog</b></span><span id="dogPct">—</span></div>
+                <div class="track"><div class="fill" id="dogFill"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <details>
+            <summary>Debug output (advanced)</summary>
+            <pre id="debugOut">—</pre>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <footer class="fade-in d2">
+      <div>
+        Space:
+        <a class="link" href="https://huggingface.co/spaces/phranchise/cat_or_dog_classifier" target="_blank" rel="noreferrer">
+          phranchise/cat_or_dog_classifier
+        </a>
+      </div>
+      <div>Endpoint: <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">/predict</span></div>
+    </footer>
+  </main>
+
+  <!-- Mobile sticky CTA -->
+  <div class="cta-bar">
+    <div class="cta-inner">
+      <button class="btn primary" id="predictBtnMobile" type="button" disabled>Predict</button>
+      <button class="btn" id="clearBtnMobile" type="button" disabled>Clear</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
+
+    const SPACE_ID = "phranchise/cat_or_dog_classifier";
+    const HF_TOKEN = null; // if private: "hf_..."
+
+    // IMPORTANT: Put these files next to index.html in your GitHub Pages repo.
+    const EXAMPLES = [
+      { name: "Cat",   hint: "Included example", file: "Cat.jpg" },
+      { name: "Dog",   hint: "Included example", file: "Dog.jpg" },
+      { name: "Mixed", hint: "Trickier case",    file: "Dunno.jpg" }
+    ];
+
+    const fileInput = document.getElementById("fileInput");
+    const preview = document.getElementById("preview");
+    const previewImg = document.getElementById("previewImg");
+    const previewHint = document.getElementById("previewHint");
+
+    const predictBtn = document.getElementById("predictBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const predictBtnMobile = document.getElementById("predictBtnMobile");
+    const clearBtnMobile = document.getElementById("clearBtnMobile");
+
+    const fileMeta = document.getElementById("fileMeta");
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+
+    const resultLabel = document.getElementById("resultLabel");
+    const resultSub = document.getElementById("resultSub");
+    const debugOut = document.getElementById("debugOut");
+
+    const catPct = document.getElementById("catPct");
+    const dogPct = document.getElementById("dogPct");
+    const catFill = document.getElementById("catFill");
+    const dogFill = document.getElementById("dogFill");
+
+    const exampleRow = document.getElementById("exampleRow");
+
+    let selectedFile = null;
+
+    function setStatus(kind, text) {
+      statusText.textContent = text;
+      statusDot.classList.remove("ok", "bad");
+      if (kind === "ok") statusDot.classList.add("ok");
+      if (kind === "bad") statusDot.classList.add("bad");
+    }
+
+    function setButtons(enabled) {
+      predictBtn.disabled = !enabled;
+      clearBtn.disabled = !enabled;
+      predictBtnMobile.disabled = !enabled;
+      clearBtnMobile.disabled = !enabled;
+    }
+
+    function resetBars() {
+      catFill.style.width = "0%";
+      dogFill.style.width = "0%";
+      catPct.textContent = "—";
+      dogPct.textContent = "—";
+    }
+
+    function setBars(catProb, dogProb) {
+      const c = Math.max(0, Math.min(1, Number(catProb)));
+      const d = Math.max(0, Math.min(1, Number(dogProb)));
+
+      catFill.style.width = (c * 100).toFixed(2) + "%";
+      dogFill.style.width = (d * 100).toFixed(2) + "%";
+      catPct.textContent = (c * 100).toFixed(2) + "%";
+      dogPct.textContent = (d * 100).toFixed(2) + "%";
+    }
+
+    function setFile(f, sourceLabel = "Image loaded") {
+      selectedFile = f;
+      setButtons(true);
+
+      const url = URL.createObjectURL(f);
+      previewImg.src = url;
+      previewImg.style.display = "block";
+      previewHint.style.display = "none";
+
+      fileMeta.textContent = `${f.name} • ${(f.size / 1024).toFixed(1)} KB`;
+      setStatus("ok", sourceLabel);
+
+      resultLabel.textContent = "Ready to predict";
+      resultSub.textContent = "Click Predict to run the model.";
+      debugOut.textContent = "—";
+      resetBars();
+    }
+
+    function resetUI() {
+      selectedFile = null;
+      fileInput.value = "";
+      previewImg.src = "";
+      previewImg.style.display = "none";
+      previewHint.style.display = "block";
+      setButtons(false);
+      fileMeta.textContent = "";
+      resultLabel.textContent = "No prediction yet";
+      resultSub.textContent = "Upload (or paste) an image, then click Predict.";
+      debugOut.textContent = "—";
+      resetBars();
+      setStatus("", "Ready");
+    }
+
+    // Upload
+    fileInput.addEventListener("change", () => {
+      const f = fileInput.files?.[0];
+      if (!f) return resetUI();
+      setFile(f, "Image loaded");
+    });
+
+    // Drag & drop
+    preview.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      preview.classList.add("dragover");
+    });
+    preview.addEventListener("dragleave", () => preview.classList.remove("dragover"));
+    preview.addEventListener("drop", (e) => {
+      e.preventDefault();
+      preview.classList.remove("dragover");
+      const f = e.dataTransfer?.files?.[0];
+      if (f && f.type.startsWith("image/")) setFile(f, "Dropped image");
+    });
+
+    // Paste support
+    document.addEventListener("paste", (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type && item.type.startsWith("image/")) {
+          const blob = item.getAsFile();
+          if (blob) {
+            const f = new File([blob], `pasted-${Date.now()}.png`, { type: blob.type || "image/png" });
+            setFile(f, "Pasted image");
+            break;
+          }
+        }
+      }
+    });
+
+    // Parse exact Space output shape:
+    // [
+    //   { label: "Dog", confidences: [{label:"Dog",confidence:0.99},{label:"Cat",confidence:0.01}] }
+    // ]
+    function parseCatDog(resData) {
+      const first = Array.isArray(resData) ? resData[0] : resData;
+      const confs = first?.confidences;
+
+      let cat = null, dog = null;
+
+      if (Array.isArray(confs)) {
+        for (const c of confs) {
+          const lbl = String(c?.label || "").toLowerCase();
+          const val = Number(c?.confidence);
+          if (!Number.isFinite(val)) continue;
+          if (lbl === "cat") cat = val;
+          if (lbl === "dog") dog = val;
+        }
+      }
+
+      // fallback if missing
+      if (cat == null) cat = 0;
+      if (dog == null) dog = 0;
+
+      // renormalize just in case (should already sum to ~1)
+      const s = (cat + dog) || 1;
+      cat = cat / s;
+      dog = dog / s;
+
+      const predicted = (dog >= cat) ? "Dog" : "Cat";
+      return { cat, dog, predicted };
+    }
+
+    async function runPrediction() {
+      if (!selectedFile) return;
+
+      setButtons(false);
+      setStatus("", "Predicting...");
+      resultLabel.textContent = "Running…";
+      resultSub.textContent = "Please wait.";
+      debugOut.textContent = "—";
+      resetBars();
+
+      try {
+        const client = await Client.connect(
+          SPACE_ID,
+          HF_TOKEN ? { hf_token: HF_TOKEN } : undefined
+        );
+
+        const res = await client.predict("/predict", { img: selectedFile });
+
+        debugOut.textContent = JSON.stringify(res.data, null, 2);
+
+        const { cat, dog, predicted } = parseCatDog(res.data);
+        setBars(cat, dog);
+
+        resultLabel.textContent = `Prediction: ${predicted}`;
+        resultSub.textContent = `Cat: ${(cat * 100).toFixed(2)}% · Dog: ${(dog * 100).toFixed(2)}%`;
+
+        setStatus("ok", "Done");
+      } catch (err) {
+        console.error(err);
+        setStatus("bad", "Error");
+        resultLabel.textContent = "Prediction failed";
+        resultSub.textContent = (err && err.message) ? err.message : String(err);
+        debugOut.textContent = (err && err.stack) ? err.stack : String(err);
+      } finally {
+        setButtons(!!selectedFile);
+      }
+    }
+
+    // Buttons
+    predictBtn.addEventListener("click", runPrediction);
+    predictBtnMobile.addEventListener("click", runPrediction);
+
+    clearBtn.addEventListener("click", resetUI);
+    clearBtnMobile.addEventListener("click", resetUI);
+
+    // Examples UI (loads local images -> converts to File -> sets as selected)
+    function renderExamples() {
+      exampleRow.innerHTML = "";
+
+      for (const ex of EXAMPLES) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "example";
+        btn.setAttribute("aria-label", `Load example: ${ex.name}`);
+
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.alt = ex.name;
+        img.src = ex.file;
+
+        const text = document.createElement("div");
+        text.className = "ex-text";
+
+        const name = document.createElement("div");
+        name.className = "ex-name";
+        name.textContent = ex.name;
+
+        const sub = document.createElement("div");
+        sub.className = "ex-sub";
+        sub.textContent = ex.hint;
+
+        text.appendChild(name);
+        text.appendChild(sub);
+
+        btn.appendChild(img);
+        btn.appendChild(text);
+
+        btn.addEventListener("click", async () => {
+          try {
+            setStatus("", "Loading example...");
+            setButtons(false);
+
+            const r = await fetch(ex.file, { cache: "no-store" });
+            if (!r.ok) throw new Error(`Failed to load example (${r.status})`);
+            const blob = await r.blob();
+
+            const ext = (blob.type && blob.type.includes("jpeg")) ? "jpg" : "png";
+            const f = new File([blob], `${ex.name.toLowerCase()}-example.${ext}`, { type: blob.type || "image/jpeg" });
+
+            setFile(f, `Example loaded: ${ex.name}`);
+          } catch (err) {
+            console.error(err);
+            setStatus("bad", "Example load failed");
+          } finally {
+            setButtons(!!selectedFile);
+          }
+        });
+
+        exampleRow.appendChild(btn);
+      }
+    }
+
+    renderExamples();
+    resetUI();
+  </script>
+</body>
+</html>
